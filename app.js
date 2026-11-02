@@ -537,6 +537,8 @@
       const sig = lunas.find((e) => e.t > m);
       tLuna = sig ? `Próximo periodo a las ${fmtHora(sig.t)} (${sig.texto.split(" · ")[0].toLowerCase()}).` : `Sin más periodos hoy · ${dia.fase.nombre.toLowerCase()}.`;
     }
+    const pFase = dia.comp.fase[m];
+    if (pFase && pFase < 97) tLuna += ` ${dia.fase.nombre}: resta ${100 - pFase}% a esta hora.`;
     // clima
     let tClima = "Sin pronóstico del clima ahora.";
     if (det.viento != null) {

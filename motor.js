@@ -91,6 +91,16 @@
   };
 
   const IMP_MAREA = { pacifico: 0.85, caribe: 0.3, dulce: 0 };
+  /* valor 0-1 cada hora relativa a la pleamar, de -6 h a +6 h (corvina/róbalo, investigación) */
+  const CURVA_CORVINA = [0.25, 0.35, 0.5, 0.7, 0.9, 1, 0.8, 0.9, 1, 0.85, 0.65, 0.45, 0.3];
+  const CURVA_ROBALO = [0.25, 0.35, 0.5, 0.7, 0.85, 0.9, 0.8, 1, 1, 0.85, 0.65, 0.45, 0.3];
+  function curvaPleamar(curva, h) {
+    const x = clamp(h, -6, 6) + 6, i = Math.min(11, Math.floor(x)), t = x - i;
+    return curva[i] + (curva[i + 1] - curva[i]) * t;
+  }
+  /* lugares con luces donde la luna llena resta (las luces juntan menos carnada) */
+  const CON_LUCES = new Set(["oceanreef", "cascoviejo", "amador", "flamenco", "costaeste", "armuelles"]);
+  const MARLIN = new Set(["pinas", "coiba"]);
 
   /* pesos según tipo de agua (Codex + Claude, orientativos) */
   const PESOS = {
@@ -219,11 +229,11 @@
     const fuerzaMarea = marea ? clamp(rango / 1.5, 0.25, 1) : 0;
 
     // cuánto manda la marea en este lugar (0 = nada, 1 = todo)
-    const wMarea = marea && etapas.length ? IMP_MAREA[lugar.tipo] : 0;
+    const wMarea = marea && etapas.length ? (lugar.estilo === "altamar" ? 0.15 : IMP_MAREA[lugar.tipo]) : 0;
     pesos.marea = wMarea;
 
     const puntaje = new Uint8Array(N);
-    const comp = { marea: new Uint8Array(N), luz: new Uint8Array(N), clima: new Uint8Array(N), luna: new Uint8Array(N) };
+    const comp = { marea: new Uint8Array(N), luz: new Uint8Array(N), clima: new Uint8Array(N), luna: new Uint8Array(N), fase: new Uint8Array(N) };
     const detalle = new Array(N);
 
     for (let m = 0; m < N; m++) {
@@ -241,10 +251,14 @@
         const subiendo = rate > 0;
         const aAlta = sig && sig.alta ? sig.t - m : null, desdeAlta = ant && ant.alta ? m - ant.t : null;
         const aBaja = sig && !sig.alta ? sig.t - m : null, desdeBaja = ant && !ant.alta ? m - ant.t : null;
+        // hora relativa a la pleamar más cercana
+        let hPlea = null;
+        for (const e of extremos) if (e.alta && (hPlea == null || Math.abs(m - e.t) < Math.abs(hPlea))) hPlea = m - e.t;
+        const h = hPlea == null ? 0 : hPlea / 60;
         const valor = (n) => {
           switch (n) {
-            case "final_llenante": return aAlta != null ? gauss(aAlta - 70, 48) : desdeAlta != null ? 0.55 * gauss(desdeAlta, 25) : 0;
-            case "inicio_vaciante": return desdeAlta != null ? gauss(desdeAlta - 60, 45) : 0;
+            case "final_llenante": return curvaPleamar(CURVA_CORVINA, h);
+            case "inicio_vaciante": return curvaPleamar(CURVA_ROBALO, h);
             case "final_vaciante": return aBaja != null ? gauss(aBaja - 60, 42) : desdeBaja != null ? 0.5 * gauss(desdeBaja, 25) : 0;
             case "inicio_llenante": return desdeBaja != null ? gauss(desdeBaja - 60, 45) : 0;
             case "llenante": return subiendo ? 0.55 + 0.45 * flujo : 0.2 * flujo;
@@ -254,16 +268,20 @@
         };
         let mejor = 0;
         for (const e of etapas) { const v = valor(e.n) * e.w; if (v > mejor) { mejor = v; etapa = e.n; } }
-        const soloFlujo = etapas.length === 1 && etapas[0].n === "cualquiera_moviendose";
-        cMarea = soloFlujo ? flujo : 0.35 * flujo + 0.65 * mejor * (0.45 + 0.55 * fuerzaDia);
-        cMarea = clamp(cMarea * (0.55 + 0.45 * fuerzaMarea), 0, 1);
+        // aguaje vs quiebra: la marea viva rinde ~1.33x más que la muerta (Pacífico, marea grande)
+        let fA = 1;
+        if (lugar.tipo === "pacifico") {
+          fA = 0.75 + 0.25 * clamp((rango - 2.5) / 2.5, 0, 1);
+          if (rango > 5.3 && ((h >= -4 && h <= -2) || (h >= 3 && h <= 5))) fA *= 0.85; // demasiada corriente a media marea
+        } else fA = 0.55 + 0.45 * fuerzaDia;
+        cMarea = clamp(mejor * fA, 0, 1);
         posMarea = rango > 0 ? (marea[k] - mnM) / rango : 0.5;
       }
 
       // luz: amanecer y atardecer mandan; mediodía con sol fuerte es lo peor
       const alt = solAlt[k];
       const vDia = perfil.dia * (1 - 0.2 * clamp((alt - 6) / 60, 0, 1));
-      const vNoche = perfil.noche * (0.88 + 0.12 * fase.fraccion); // la luna llena ayuda un poco de noche
+      const vNoche = perfil.noche;
       let cLuz = alt >= 6 ? vDia : alt <= -6 ? vNoche : vNoche + (vDia - vNoche) * ((alt + 6) / 12);
       let gA = 0, gP = 0;
       for (const t of salidaSol) gA = Math.max(gA, gauss(m - (t + 10), 50));
@@ -274,10 +292,21 @@
       const franja = gA > 0.5 ? "amanecer" : gP > 0.5 ? "atardecer" : alt > 0 ? "dia" : "noche";
 
       // luna (solunar): periodos mayores ±1 h, menores ±30 min, fuerza según fase
-      let sol = 0.08;
-      for (const e of mayores) sol = Math.max(sol, gauss(m - e.t, 42));
-      for (const e of menores) sol = Math.max(sol, 0.7 * gauss(m - e.t, 22));
-      const cLuna = clamp(sol * (0.7 + 0.3 * faseFuerza), 0, 1);
+      // la evidencia dice que pesa poco: como mucho +5 % en periodo mayor y +2 % en menor
+      let gMay = 0, gMen = 0;
+      for (const e of mayores) gMay = Math.max(gMay, gauss(m - e.t, 42));
+      for (const e of menores) gMen = Math.max(gMen, gauss(m - e.t, 22));
+      const multSolunar = 1 + Math.max(0.05 * gMay, 0.02 * gMen);
+      const cLuna = clamp(Math.max(gMay, 0.6 * gMen), 0, 1);
+      // fase de la luna
+      let multFase = 1;
+      const llena = fase.fraccion, crece = fase.creciente;
+      if (lugar.estilo === "altamar") {
+        if (MARLIN.has(lugar.id)) multFase = (!crece && llena > 0.4) || llena > 0.9 ? 1 : 0.92;
+        else multFase = (crece && llena < 0.6) || llena < 0.08 ? 1 : 0.9;
+      } else if (alt < -6) {
+        multFase = CON_LUCES.has(lugar.id) ? 1 - 0.15 * llena : 1 - 0.05 * llena;
+      }
 
       // clima
       let cClima = 0.75, aviso = null;
@@ -303,7 +332,7 @@
 
       // la hora y la marea se multiplican: de noche con la marea mala no sale alto
       const nucleo = cLuz * (1 - wMarea + wMarea * cMarea);
-      let total = 0.73 * nucleo + 0.17 * cClima + 0.1 * cLuna;
+      let total = (0.8 * nucleo + 0.2 * cClima) * multSolunar * multFase;
       if (marea && perfil.mareaMala === "baja" && posMarea < 0.2) total *= 0.55 + 0.45 * (posMarea / 0.2);
       if (marea && perfil.mareaMala === "alta" && posMarea > 0.85) total *= 0.6 + 0.4 * ((1 - posMarea) / 0.15);
       if (aviso && cod >= 95) total = Math.min(total, 0.15);
@@ -312,6 +341,7 @@
       comp.luz[m] = Math.round(cLuz * 100);
       comp.clima[m] = Math.round(cClima * 100);
       comp.luna[m] = Math.round(cLuna * 100);
+      comp.fase[m] = Math.round(multFase * 100);
       detalle[m] = { rate, etapa, franja, posMarea, viento: v, rafagas: r, olas: o, lluvia: ll, aviso, solAlt: alt };
     }
 
