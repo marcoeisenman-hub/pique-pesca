@@ -217,10 +217,11 @@
           if (dp < -0.8 && dp > -3) cClima += 0.06; // presión bajando poco: los peces comen antes del frente
           if (dp > 1.5) cClima -= 0.06;
         }
-        if (cod >= 95) { cClima = Math.min(cClima, 0.1); aviso = "Tormenta eléctrica: no salgas al agua"; }
-        else if (v > 35 || (o != null && o > 2.8)) aviso = "Mar picado o mucho viento: cuidado en lancha";
+        if (v > 35 || (o != null && o > 2.8)) aviso = "Mar picado o mucho viento: cuidado en lancha";
         cClima = clamp(cClima, 0, 1);
       }
+      // tormenta eléctrica cuenta aunque falte el viento
+      if (cod >= 95) { cClima = Math.min(cClima, 0.1); aviso = "Tormenta eléctrica: no salgas al agua"; }
 
       let total = pesos.marea * cMarea + pesos.luz * cLuz + pesos.clima * cClima + pesos.luna * cLuna;
       if (lugar.tipo === "dulce") total *= 0.93; // sin marea hay menos señales fuertes

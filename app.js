@@ -4,7 +4,7 @@
 
   const $ = (id) => document.getElementById(id);
   const ROW = 26; // alto de cada minuto en el carrete (px)
-  const DIAS = 7;
+  const DIAS = 7, DIA_MS = 864e5;
   const TIPO_NOMBRE = { pacifico: "Pacífico", caribe: "Caribe", dulce: "Agua dulce" };
 
   const estado = { pais: "PA", lugar: null, datos: null, dias: [], dia: 0, minuto: 0, inicios: [] };
@@ -92,7 +92,7 @@
     const clave = "pique-datos-" + l.id;
     try {
       const c = JSON.parse(sessionStorage.getItem(clave) || "null");
-      if (c && Date.now() - c.t < 30 * 60000) return c.d;
+      if (c && Date.now() - c.t < 30 * 60000 && Date.now() - c.d.tiempos[24] * 1000 < DIA_MS && Date.now() >= c.d.tiempos[24] * 1000) return c.d; // no reusar si ya cambió el día
     } catch (e) {}
     const q = `latitude=${l.lat}&longitude=${l.lon}&timezone=America%2FPanama&past_days=1&forecast_days=8&timeformat=unixtime`;
     const pClima = fetch(`https://api.open-meteo.com/v1/forecast?${q}&hourly=wind_speed_10m,wind_gusts_10m,pressure_msl,precipitation,weather_code,cloud_cover`).then((r) => {
