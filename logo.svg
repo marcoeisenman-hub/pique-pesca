@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -26 250 116" role="img" aria-label="pique">
+  <g fill="none" stroke="#F3EBDD" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <!-- p -->
+    <path d="M10 14 V80"/>
+    <circle cx="27.5" cy="30.5" r="17.5"/>
+    <!-- i (el punto es la boya) -->
+    <path d="M64 15 V47"/>
+    <!-- q: la cola es un anzuelo -->
+    <circle cx="98.5" cy="30.5" r="17.5"/>
+    <path d="M116 14 V68 a11 11 0 0 0 22 0 v-7"/>
+    <path d="M138 61 l-6.5 6" stroke-width="7"/>
+    <!-- u -->
+    <path d="M139 14 V30 a17.5 17.5 0 0 0 35 0 V14 M174 14 V47"/>
+    <!-- e -->
+    <path d="M194 31 H228 A17.5 17.5 0 1 0 222.5 44"/>
+  </g>
+  <!-- boya: un poco ladeada, como flotando -->
+  <g transform="rotate(-14 64 -6)">
+    <path d="M64 -20 V-13" stroke="#F3EBDD" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M55 -6 a9 9 0 0 1 18 0 z" fill="#FF5A1F"/>
+    <path d="M55 -6 a9 9 0 0 0 18 0 z" fill="#F3EBDD"/>
+  </g>
+</svg>

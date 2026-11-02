@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>pique · la mejor hora para pescar</title>
+  <meta name="description" content="Elige dónde vas a pescar y mira, minuto a minuto, qué tan bueno está el pique del 1 al 100 según la marea, la luna, el sol y el clima." />
+  <meta name="theme-color" content="#08303F" />
+  <link rel="icon" href="icono.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icono.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="top">
+    <a class="marca" href="./" id="ir-inicio" aria-label="pique, inicio"><img src="logo.svg" alt="pique" width="112" height="52" /></a>
+    <button class="lugar-btn" id="lugar-btn" type="button" hidden></button>
+  </header>
+
+  <!-- Paso 1 y 2: país y lugar -->
+  <main id="elegir" class="elegir">
+    <h1>¿Dónde vas a pescar?</h1>
+    <p class="sub">Escoge el país y el lugar. Te decimos, minuto a minuto, cuándo pica más.</p>
+
+    <div class="paso">
+      <h2 class="paso-t">País</h2>
+      <div class="paises" id="paises" role="radiogroup" aria-label="País"></div>
+    </div>
+
+    <div class="paso" id="paso-lugar">
+      <h2 class="paso-t"><label for="buscar">Lugar</label></h2>
+      <div class="buscador">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>
+        <input id="buscar" type="search" autocomplete="off" placeholder="Ej. Ocean Reef, Coiba, Bocas…" role="combobox" aria-expanded="false" aria-controls="opciones" />
+      </div>
+      <ul class="opciones" id="opciones" role="listbox" aria-label="Lugares"></ul>
+    </div>
+  </main>
+
+  <!-- El día minuto a minuto -->
+  <main id="dia" class="dia" hidden>
+    <section class="cabeza">
+      <div>
+        <h1 id="l-nombre"></h1>
+        <p class="l-meta" id="l-meta"></p>
+      </div>
+      <div class="dias" id="dias" role="tablist" aria-label="Día"></div>
+    </section>
+
+    <div class="estado" id="estado" role="status"></div>
+
+    <div class="tablero" id="tablero">
+      <aside class="panel">
+        <div class="ahora">
+          <div class="nota" id="nota">
+            <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="aro-f" cx="60" cy="60" r="52"/><circle class="aro" id="aro" cx="60" cy="60" r="52"/></svg>
+            <span id="num">–</span>
+          </div>
+          <div>
+            <p class="hora" id="hora">–</p>
+            <p class="eti" id="eti"></p>
+            <p class="aviso" id="aviso" hidden></p>
+          </div>
+        </div>
+
+        <ul class="factores" id="factores"></ul>
+
+        <div class="tarjeta senuelo">
+          <h3>Qué tirar a esta hora</h3>
+          <p class="s-prin" id="s-prin"></p>
+          <p class="s-alt" id="s-alt"></p>
+          <p class="s-col" id="s-col"></p>
+          <p class="s-por" id="s-por"></p>
+        </div>
+
+        <div class="tarjeta">
+          <h3>Mejores ratos del día</h3>
+          <ol class="ratos" id="ratos"></ol>
+        </div>
+      </aside>
+
+      <section class="carrete-wrap" aria-label="Minutos del día">
+        <div class="resumen-wrap">
+          <canvas id="resumen" aria-label="Resumen del día: toca para saltar a esa hora"></canvas>
+        </div>
+        <div class="controles">
+          <button type="button" data-salto="-60" aria-label="Una hora antes">−1 h</button>
+          <button type="button" data-salto="-1" aria-label="Un minuto antes">−1 min</button>
+          <button type="button" data-salto="1" aria-label="Un minuto después">+1 min</button>
+          <button type="button" data-salto="60" aria-label="Una hora después">+1 h</button>
+          <button type="button" id="b-ahora">Ahora</button>
+        </div>
+        <div class="carrete" id="carrete" tabindex="0" role="slider" aria-label="Minuto del día" aria-valuemin="0" aria-valuemax="1439">
+          <canvas id="lienzo"></canvas>
+          <div class="relleno" id="relleno"></div>
+        </div>
+        <p class="ayuda">Desliza para recorrer el día minuto a minuto. La boya marca el minuto elegido.</p>
+      </section>
+    </div>
+
+    <section class="como">
+      <h2>Cómo sale el número</h2>
+      <p>Cada minuto junta cuatro cosas: el movimiento de la marea (el agua que se mueve trae comida), la luz (amanecer y atardecer son lo mejor), los periodos de la luna (cuando está arriba, abajo, saliendo o poniéndose) y el clima (viento, olas, lluvia y la presión). En el Caribe la marea casi no cambia, así que pesa menos; en los lagos no cuenta.</p>
+      <p>Es una guía para escoger la hora, no una promesa de que vas a sacar algo. La marea viene de un modelo del océano y puede variar unos minutos o centímetros dentro de bahías y esteros. No la uses para navegar.</p>
+    </section>
+  </main>
+
+  <footer class="pie">
+    <p>Marea y clima: <a href="https://open-meteo.com/" rel="noopener">Open-Meteo</a> (CC BY 4.0). Sol y luna calculados en tu teléfono.</p>
+  </footer>
+
+  <script src="lugares.js"></script>
+  <script src="motor.js"></script>
+  <script src="senuelos.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
