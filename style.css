@@ -97,6 +97,9 @@ a { color: var(--espuma); }
 .cabeza { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
 .cabeza h1 { font: 900 clamp(40px, 8vw, 68px)/0.92 var(--display); margin: 0; }
 .l-meta { color: var(--suave); margin: 6px 0 0; font-size: 15px; }
+.dias-wrap { min-width: 0; max-width: 100%; }
+.dias-t { margin: 0 0 6px; font-size: 12.5px; color: var(--suave); }
+.ratos em.top { font-style: normal; font-size: 11.5px; font-weight: 700; background: var(--boya); color: #fff; border-radius: 99px; padding: 1px 7px; margin-left: 4px; }
 .dias { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; max-width: 100%; }
 .dias::-webkit-scrollbar { display: none; }
 .dia-b {

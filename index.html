@@ -47,7 +47,10 @@
         <h1 id="l-nombre"></h1>
         <p class="l-meta" id="l-meta"></p>
       </div>
-      <div class="dias" id="dias" role="tablist" aria-label="Día"></div>
+      <div class="dias-wrap">
+        <p class="dias-t" id="dias-t"></p>
+        <div class="dias" id="dias" role="tablist" aria-label="Día"></div>
+      </div>
     </section>
 
     <div class="estado" id="estado" role="status"></div>
@@ -88,6 +91,11 @@
         <div class="tarjeta" id="t-nota" hidden>
           <h3>Lo que hay que saber de este lugar</h3>
           <p class="nota-l" id="nota-l"></p>
+        </div>
+
+        <div class="tarjeta">
+          <h3 id="semana-t">¿Qué día ir?</h3>
+          <ol class="ratos" id="semana"></ol>
         </div>
 
         <div class="tarjeta">

@@ -150,7 +150,7 @@
           datos.estacionFuente = window.Mareas.estaciones[l.estacion].fuente;
         } catch (e) { console.error(e); }
       }
-      for (let d = 0; d < DIAS; d++) {
+      for (let d = 0; d <= DIAS; d++) {
         const ini = datos.tiempos[24 + d * 24] * 1000;
         estado.inicios.push(ini);
         estado.dias.push(window.Motor.calcularDia(l, datos, ini));
@@ -166,20 +166,63 @@
     }
   }
 
+  /* lugar de noche: la noche cuenta de 6 p. m. a 6 a. m. del día siguiente */
+  const esNocturno = () => estado.lugar.perfil && estado.lugar.perfil.noche >= 0.8;
+  function mejorRato(d) {
+    const dia = estado.dias[d], sig = estado.dias[d + 1];
+    let max = 0, t = 0;
+    if (esNocturno() && sig) {
+      for (let m = 1080; m < 1440; m++) if (dia.puntaje[m] > max) { max = dia.puntaje[m]; t = m; }
+      for (let m = 0; m < 360; m++) if (sig.puntaje[m] > max) { max = sig.puntaje[m]; t = 1440 + m; }
+    } else {
+      for (let m = 0; m < 1440; m++) if (dia.puntaje[m] > max) { max = dia.puntaje[m]; t = m; }
+    }
+    return { max, t };
+  }
+  const fmtDia = new Intl.DateTimeFormat("es-PA", { weekday: "short", day: "numeric", timeZone: "America/Panama" });
+  const fmtDiaLargo = new Intl.DateTimeFormat("es-PA", { weekday: "long", day: "numeric", timeZone: "America/Panama" });
+  const nombreDia = (d, largo) => d === 0 ? "Hoy" : d === 1 ? "Mañana" : (largo ? fmtDiaLargo : fmtDia).format(new Date(estado.inicios[d] + 6 * 3600000)).replace(".", "");
+  function irAMinutoAbs(d, t) {
+    if (t >= 1440 && d + 1 < DIAS) elegirDia(d + 1, false, t - 1440);
+    else elegirDia(d, false, Math.min(t, 1439));
+  }
   function pintarDias() {
     const cont = $("dias");
     cont.innerHTML = "";
-    const fmt = new Intl.DateTimeFormat("es-PA", { weekday: "short", day: "numeric", timeZone: "America/Panama" });
-    estado.dias.forEach((dia, d) => {
+    const noct = esNocturno();
+    for (let d = 0; d < DIAS; d++) {
+      const r = mejorRato(d);
       const b = document.createElement("button");
       b.type = "button"; b.className = "dia-b"; b.setAttribute("role", "tab");
       b.setAttribute("aria-selected", String(d === estado.dia));
-      const nombre = d === 0 ? "Hoy" : d === 1 ? "Mañana" : fmt.format(new Date(estado.inicios[d] + 6 * 3600000)).replace(".", "");
-      b.innerHTML = `<small>${nombre}</small><b style="color:${d === estado.dia ? "" : colorPuntaje(dia.maximo)}">${dia.maximo}</b>`;
-      b.title = `Lo mejor de ese día: ${dia.maximo} de 100`;
+      b.innerHTML = `<small>${nombreDia(d)}</small><b style="color:${d === estado.dia ? "" : colorPuntaje(r.max)}">${r.max}</b>`;
+      b.title = noct ? `Lo mejor de esa noche: ${r.max} de 100` : `Lo mejor de ese día: ${r.max} de 100`;
       b.addEventListener("click", () => elegirDia(d));
       cont.appendChild(b);
-    });
+    }
+    $("dias-t").textContent = noct ? "Lo mejor de cada noche" : "Lo mejor de cada día";
+    pintarSemana();
+  }
+  function pintarSemana() {
+    const noct = esNocturno(), ol = $("semana");
+    $("semana-t").textContent = noct ? "¿Qué noche ir?" : "¿Qué día ir?";
+    const filas = [];
+    for (let d = 0; d < DIAS; d++) filas.push({ d, ...mejorRato(d) });
+    const top = Math.max(...filas.map((f) => f.max));
+    ol.innerHTML = "";
+    for (const f of filas) {
+      // marea alta más cercana a la mejor hora
+      const ini = estado.inicios[f.d] + f.t * 60000;
+      const alta = extremosAbs().filter((e) => e.alta).sort((a, b) => Math.abs(a.t - ini) - Math.abs(b.t - ini))[0];
+      const li = document.createElement("li"), b = document.createElement("button");
+      b.type = "button";
+      b.style.setProperty("--c", colorPuntaje(f.max));
+      const mejor = f.max === top ? ' <em class="top">la mejor</em>' : "";
+      const altaTxt = alta && estado.lugar.tipo === "pacifico" ? ` · alta ${fmtHora(Math.round((alta.t - estado.inicios[f.d]) / 60000))}` : "";
+      b.innerHTML = `<span>${noct ? (f.d === 0 ? "Esta noche" : nombreDia(f.d, true) + " en la noche") : nombreDia(f.d, true)}${mejor}<br><small>Mejor hora ${fmtHora(f.t)}${altaTxt}</small></span><b>${f.max}</b>`;
+      b.addEventListener("click", () => irAMinutoAbs(f.d, f.t));
+      li.appendChild(b); ol.appendChild(li);
+    }
   }
 
   function minutoAhora() {
@@ -187,12 +230,12 @@
     return m >= 0 && m < 1440 ? m : null;
   }
 
-  function elegirDia(d, inicial) {
+  function elegirDia(d, inicial, objetivo) {
     estado.dia = d;
     pintarDias();
     const dia = estado.dias[d];
     const ahora = minutoAhora();
-    let m = d === 0 && ahora != null ? ahora : dia.mejores.slice().sort((a, b) => b.max - a.max)[0].pico;
+    let m = objetivo != null ? objetivo : d === 0 && ahora != null ? ahora : mejorRato(d).t % 1440;
     $("b-ahora").hidden = !(d === 0 && ahora != null);
     pintarRatos();
     pintarMareas();

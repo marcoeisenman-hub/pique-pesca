@@ -90,6 +90,8 @@
     dulce: { noche: 0.25, amanecer: 1, dia: 0.5, atardecer: 0.95, marea: [], mareaMala: "ninguna" },
   };
 
+  const IMP_MAREA = { pacifico: 0.85, caribe: 0.3, dulce: 0 };
+
   /* pesos según tipo de agua (Codex + Claude, orientativos) */
   const PESOS = {
     pacifico: { marea: 0.34, luz: 0.36, clima: 0.14, luna: 0.16 },
@@ -136,7 +138,7 @@
     const faseFuerza = Math.abs(Math.cos(fase.inc)); // 1 en llena/nueva, 0 en cuartos
 
     // marea por minuto
-    let marea = null, mareaRate = null, rango = 0, maxRate = 0;
+    let marea = null, mareaRate = null, rango = 0, maxRate = 0, rangoRef = 0, maxRateRef = 0;
     // marea: primero la predicción armónica de la estación (como las tablas oficiales); si no hay, el modelo del océano
     const est = lugar.tipo !== "dulce" ? datos.estacion : null;
     const mareaArr = est ? est.niveles : lugar.tipo !== "dulce" ? limpiar(datos.marea) : null;
@@ -156,6 +158,16 @@
         maxRate = Math.max(maxRate, Math.abs(mareaRate[k]));
       }
       rango = mx - mn;
+      // referencia de la semana: así las mareas grandes (luna llena/nueva) valen más que las chiquitas
+      if (est) {
+        let gmn = Infinity, gmx = -Infinity, gr = 0;
+        const nv = est.niveles;
+        for (let i = 0; i < nv.length; i++) {
+          gmn = Math.min(gmn, nv[i]); gmx = Math.max(gmx, nv[i]);
+          if (i) gr = Math.max(gr, Math.abs(nv[i] - nv[i - 1]) * (3600000 / est.paso));
+        }
+        rangoRef = gmx - gmn; maxRateRef = gr;
+      } else { rangoRef = rango; maxRateRef = maxRate; }
       if (est) {
         for (const e of est.extremos) {
           const t = Math.round((e.t - inicioMs) / 60000);
@@ -206,6 +218,10 @@
     // una marea casi plana no puede contar como señal fuerte
     const fuerzaMarea = marea ? clamp(rango / 1.5, 0.25, 1) : 0;
 
+    // cuánto manda la marea en este lugar (0 = nada, 1 = todo)
+    const wMarea = marea && etapas.length ? IMP_MAREA[lugar.tipo] : 0;
+    pesos.marea = wMarea;
+
     const puntaje = new Uint8Array(N);
     const comp = { marea: new Uint8Array(N), luz: new Uint8Array(N), clima: new Uint8Array(N), luna: new Uint8Array(N) };
     const detalle = new Array(N);
@@ -218,7 +234,8 @@
       let etapa = null, posMarea = 0.5;
       if (marea) {
         rate = mareaRate[k];
-        const flujo = maxRate > 0 ? Math.pow(Math.abs(rate) / maxRate, 0.75) : 0;
+        const flujo = maxRateRef > 0 ? Math.pow(Math.min(1, Math.abs(rate) / maxRateRef), 0.75) : 0;
+        const fuerzaDia = rangoRef > 0 ? clamp(rango / rangoRef, 0, 1) : 1;
         let ant = null, sig = null;
         for (const e of extremos) { if (e.t <= m) ant = e; else { sig = e; break; } }
         const subiendo = rate > 0;
@@ -238,7 +255,7 @@
         let mejor = 0;
         for (const e of etapas) { const v = valor(e.n) * e.w; if (v > mejor) { mejor = v; etapa = e.n; } }
         const soloFlujo = etapas.length === 1 && etapas[0].n === "cualquiera_moviendose";
-        cMarea = soloFlujo ? flujo : 0.35 * flujo + 0.65 * mejor;
+        cMarea = soloFlujo ? flujo : 0.35 * flujo + 0.65 * mejor * (0.45 + 0.55 * fuerzaDia);
         cMarea = clamp(cMarea * (0.55 + 0.45 * fuerzaMarea), 0, 1);
         posMarea = rango > 0 ? (marea[k] - mnM) / rango : 0.5;
       }
@@ -284,10 +301,11 @@
       // tormenta eléctrica cuenta aunque falte el viento
       if (cod >= 95) { cClima = Math.min(cClima, 0.1); aviso = "Tormenta eléctrica: no salgas al agua"; }
 
-      let total = pesos.marea * cMarea + pesos.luz * cLuz + pesos.clima * cClima + pesos.luna * cLuna;
+      // la hora y la marea se multiplican: de noche con la marea mala no sale alto
+      const nucleo = cLuz * (1 - wMarea + wMarea * cMarea);
+      let total = 0.73 * nucleo + 0.17 * cClima + 0.1 * cLuna;
       if (marea && perfil.mareaMala === "baja" && posMarea < 0.2) total *= 0.55 + 0.45 * (posMarea / 0.2);
       if (marea && perfil.mareaMala === "alta" && posMarea > 0.85) total *= 0.6 + 0.4 * ((1 - posMarea) / 0.15);
-      if (lugar.tipo === "dulce") total *= 0.93; // sin marea hay menos señales fuertes
       if (aviso && cod >= 95) total = Math.min(total, 0.15);
       puntaje[m] = clamp(Math.round(100 * Math.pow(total, 0.92)), 1, 100);
       comp.marea[m] = Math.round(cMarea * 100);
@@ -300,7 +318,7 @@
     return {
       puntaje, comp, detalle, eventos, pesos, perfil,
       marea: marea ? marea.subarray(MARGEN, MARGEN + N) : null,
-      mareaTodo: marea, margen: MARGEN, rango, fuenteMarea: est ? "estacion" : marea ? "modelo" : null,
+      mareaTodo: marea, margen: MARGEN, rango, rangoRef, fuenteMarea: est ? "estacion" : marea ? "modelo" : null,
       fase: { ...fase, nombre: nombreFase(fase) },
       mejores: mejoresRatos(puntaje),
       maximo: puntaje.reduce((a, b) => Math.max(a, b), 0),
