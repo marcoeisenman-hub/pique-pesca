@@ -176,7 +176,13 @@
       for (let m = 1080; m < 1440; m++) if (dia.puntaje[m] > max) { max = dia.puntaje[m]; t = m; }
       if (sig) for (let m = 0; m < 360; m++) if (sig.puntaje[m] > max) { max = sig.puntaje[m]; t = 1440 + m; }
     }
-    return { max, t, parte };
+    // el rato completo alrededor de lo mejor (hasta 3 puntos menos)
+    const val = (x) => (x < 1440 ? dia.puntaje[x] : sig ? sig.puntaje[x - 1440] : 0);
+    const lo = parte === "dia" ? 360 : 1080, hi = parte === "dia" ? 1079 : sig ? 1799 : 1439;
+    let ini = t, fin = t;
+    while (ini > lo && val(ini - 1) >= max - 3) ini--;
+    while (fin < hi && val(fin + 1) >= max - 3) fin++;
+    return { max, t, parte, ini, fin };
   }
   function mejorRato(d) {
     const a = mejorDe(d, "dia"), b = mejorDe(d, "noche");
@@ -226,8 +232,8 @@
         b.type = "button";
         b.style.setProperty("--c", colorPuntaje(r.max));
         const etiqueta = r.parte === "dia" ? "De día" : "De noche";
-        b.innerHTML = `<span>${r.parte === "dia" ? SOL : LUNA} ${etiqueta}${r.max === top ? ' <em class="top">la mejor</em>' : ""}<br><small>${fmtHora(r.t)}</small></span><b>${r.max}</b>`;
-        b.setAttribute("aria-label", `${nombreDia(f.d, true)} ${etiqueta.toLowerCase()}: ${r.max} de 100, mejor a las ${fmtHora(r.t)}`);
+        b.innerHTML = `<span>${r.parte === "dia" ? SOL : LUNA} ${etiqueta}${r.max === top ? ' <em class="top">la mejor</em>' : ""}<br><small>${r.fin - r.ini >= 10 ? `${fmtHora(r.ini, false)} a ${fmtHora(r.fin)}` : fmtHora(r.t)}</small></span><b>${r.max}</b>`;
+        b.setAttribute("aria-label", `${nombreDia(f.d, true)} ${etiqueta.toLowerCase()}: ${r.max} de 100, de ${fmtHora(r.ini)} a ${fmtHora(r.fin)}`);
         b.addEventListener("click", () => irAMinutoAbs(f.d, r.t));
         li.appendChild(b);
       }

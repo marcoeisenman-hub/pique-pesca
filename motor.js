@@ -92,7 +92,8 @@
 
   const IMP_MAREA = { pacifico: 0.85, caribe: 0.3, dulce: 0 };
   /* valor 0-1 cada hora relativa a la pleamar, de -6 h a +6 h (corvina/róbalo, investigación) */
-  const CURVA_CORVINA = [0.25, 0.35, 0.5, 0.7, 0.9, 1, 0.8, 0.9, 1, 0.85, 0.65, 0.45, 0.3];
+  // la llenante (1-2 h antes de la alta) es lo mejor, según los pescadores locales; después de la alta sigue bueno
+  const CURVA_CORVINA = [0.25, 0.35, 0.5, 0.72, 0.95, 1, 0.82, 0.88, 0.85, 0.7, 0.55, 0.4, 0.3];
   const CURVA_ROBALO = [0.25, 0.35, 0.5, 0.7, 0.85, 0.9, 0.8, 1, 1, 0.85, 0.65, 0.45, 0.3];
   function curvaPleamar(curva, h) {
     const x = clamp(h, -6, 6) + 6, i = Math.min(11, Math.floor(x)), t = x - i;
