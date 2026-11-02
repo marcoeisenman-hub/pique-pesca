@@ -447,6 +447,8 @@
       nubes: estado.datos.nubes ? estado.datos.nubes[Math.round((estado.inicios[estado.dia] + m * 60000 - estado.datos.horas0) / 3600000)] : null,
     });
     $("s-prin").textContent = s.principal;
+    $("s-sin").hidden = !s.sinCarnada;
+    $("s-sin").innerHTML = s.sinCarnada ? `<b>Si no tienes carnada:</b> ${s.sinCarnada.charAt(0).toLowerCase() + s.sinCarnada.slice(1)}.` : "";
     $("s-alt").textContent = "Si no pica: " + s.alterno.charAt(0).toLowerCase() + s.alterno.slice(1) + ".";
     $("s-col").textContent = "Colores: " + s.color.charAt(0).toLowerCase() + s.color.slice(1) + ".";
     $("s-por").textContent = s.porque;

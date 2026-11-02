@@ -13,7 +13,7 @@
       : turbio ? "Brillantes (chartreuse, rosado, dorado) porque el agua está movida o el cielo gris"
       : "Naturales (plateado, azul, blanco) con el agua clara";
 
-    let principal, alterno, porque;
+    let principal, alterno, porque, sinCarnada = null;
 
     if (lugar.tipo === "dulce") {
       if (lugar.id === "fortuna") {
@@ -33,7 +33,7 @@
         alterno = "Spinnerbait oscuro con paleta grande (hace ruido)";
         porque = "De noche el pez caza por vibración, no por vista.";
       }
-      return { principal, alterno, color, porque };
+      return { principal, alterno, color, porque, sinCarnada };
     }
 
     if (lugar.estilo === "altamar") {
@@ -47,14 +47,15 @@
         porque = "Con la marea corriendo, los peces se paran en los bajos a esperar comida.";
       } else if (momento === "crepusculo") {
         principal = "Curricán con ballyhoo o carnada viva";
-        alterno = "Pulpito (señuelo de falda) rosado o azul";
+        alterno = "Señuelo de buceo grande a 6–7 nudos";
+        sinCarnada = "Pulpito (señuelo de falda) rosado o azul troleado a 7–8 nudos";
         porque = "Es la hora en que marlín, dorado y atún salen a comer.";
       } else {
         principal = "Curricán: pulpito (señuelo de falda) azul y blanco a 7–8 nudos";
         alterno = "Señuelo de buceo profundo para wahoo";
         porque = "De día se cubre más agua troleando hasta encontrar el cardumen.";
       }
-      return { principal, alterno, color, porque };
+      return { principal, alterno, color, porque, sinCarnada };
     }
 
     // costa: orilla o lancha
@@ -68,7 +69,8 @@
       porque = "Con poca luz el pez gallo, el jurel y el róbalo atacan en la superficie.";
     } else if (momento === "noche") {
       principal = "Camarón vivo con flotador";
-      alterno = "Vinil oscuro con cola de paleta, despacio";
+      alterno = "Jerkbait oscuro cerca de las luces del muelle";
+      sinCarnada = "Camarón de plástico o vinil oscuro con cola de paleta, recogido muy despacio";
       porque = "De noche corvina y róbalo comen pegados a las rocas y luces del muelle.";
     } else if (fuerte) {
       principal = "Jig metálico de 30–60 g, deja que baje y recoge rápido";
@@ -76,7 +78,8 @@
       porque = "La marea moviéndose arrastra comida y los peces se activan.";
     } else if (floja) {
       principal = "Carnada viva (sardina o camarón) en el fondo";
-      alterno = "Vinil pequeño trabajado muy despacio";
+      alterno = "Jig pequeño rebotando en el fondo";
+      sinCarnada = "Vinil pequeño (camarón o pececito de plástico) con poco plomo, casi sin moverlo";
       porque = "Con la marea parada los peces comen poco: ponles la comida enfrente.";
     } else {
       principal = rate > 0 ? "Vinil con cabeza plomada siguiendo la marea que entra" : "Jig pequeño en las salidas de agua (bocas, canales)";
@@ -86,7 +89,7 @@
     if (lugar.estilo === "lancha" && momento === "dia" && !fuerte) {
       alterno = "Curricán lento con señuelo de buceo cerca de las islas";
     }
-    return { principal, alterno, color, porque };
+    return { principal, alterno, color, porque, sinCarnada };
   }
 
   raiz.Senuelos = { recomendar };
