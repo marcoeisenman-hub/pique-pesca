@@ -147,6 +147,7 @@
           const t0 = datos.tiempos[0] * 1000;
           datos.estacion = window.Mareas.predecir(l.estacion, t0, t0 + (DIAS + 2) * DIA_MS);
           datos.estacionNombre = window.Mareas.estaciones[l.estacion].nombre;
+          datos.estacionFuente = window.Mareas.estaciones[l.estacion].fuente;
         } catch (e) { console.error(e); }
       }
       for (let d = 0; d < DIAS; d++) {
@@ -238,7 +239,9 @@
     }
     ul.innerHTML = ms.map((e) => `<li data-t="${e.t}">${e.alta ? FLECHA_ALTA : FLECHA_BAJA}<span>${e.alta ? "Alta" : "Baja"} <span class="alt">${e.nivel.toFixed(1)} m</span></span><b>${fmtHora(e.t)}</b></li>`).join("");
     $("m-fuente").textContent = dia.fuenteMarea === "estacion"
-      ? `Estación de marea ${estado.datos.estacionNombre} (NOAA). Altura sobre la bajamar media.`
+      ? (/NOAA|Oceanic/i.test(estado.datos.estacionFuente || "")
+        ? `Estación de marea ${estado.datos.estacionNombre} (NOAA). Altura sobre la bajamar media.`
+        : `Estación de marea ${estado.datos.estacionNombre} (TICON-4). Altura sobre la marea más baja posible.`)
       : "Modelo del océano (Open-Meteo): las horas pueden variar unos minutos.";
   }
   function durTexto(min) {
