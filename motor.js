@@ -273,7 +273,7 @@
         if (lugar.tipo === "pacifico") {
           fA = 0.75 + 0.25 * clamp((rango - 2.5) / 2.5, 0, 1);
           if (rango > 5.3 && ((h >= -4 && h <= -2) || (h >= 3 && h <= 5))) fA *= 0.85; // demasiada corriente a media marea
-        } else fA = 0.55 + 0.45 * fuerzaDia;
+        } else fA = (0.55 + 0.45 * fuerzaDia) * fuerzaMarea; // una marea casi plana no cuenta como señal fuerte
         cMarea = clamp(mejor * fA, 0, 1);
         posMarea = rango > 0 ? (marea[k] - mnM) / rango : 0.5;
       }
