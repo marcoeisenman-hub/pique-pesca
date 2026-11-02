@@ -166,19 +166,24 @@
     }
   }
 
-  /* lugar de noche: la noche cuenta de 6 p. m. a 6 a. m. del día siguiente */
-  const esNocturno = () => estado.lugar.perfil && estado.lugar.perfil.noche >= 0.8;
-  function mejorRato(d) {
+  /* el día va de 6 a. m. a 6 p. m.; la noche de 6 p. m. a 6 a. m. del día siguiente */
+  function mejorDe(d, parte) {
     const dia = estado.dias[d], sig = estado.dias[d + 1];
-    let max = 0, t = 0;
-    if (esNocturno() && sig) {
-      for (let m = 1080; m < 1440; m++) if (dia.puntaje[m] > max) { max = dia.puntaje[m]; t = m; }
-      for (let m = 0; m < 360; m++) if (sig.puntaje[m] > max) { max = sig.puntaje[m]; t = 1440 + m; }
+    let max = 0, t = parte === "dia" ? 360 : 1080;
+    if (parte === "dia") {
+      for (let m = 360; m < 1080; m++) if (dia.puntaje[m] > max) { max = dia.puntaje[m]; t = m; }
     } else {
-      for (let m = 0; m < 1440; m++) if (dia.puntaje[m] > max) { max = dia.puntaje[m]; t = m; }
+      for (let m = 1080; m < 1440; m++) if (dia.puntaje[m] > max) { max = dia.puntaje[m]; t = m; }
+      if (sig) for (let m = 0; m < 360; m++) if (sig.puntaje[m] > max) { max = sig.puntaje[m]; t = 1440 + m; }
     }
-    return { max, t };
+    return { max, t, parte };
   }
+  function mejorRato(d) {
+    const a = mejorDe(d, "dia"), b = mejorDe(d, "noche");
+    return b.max > a.max ? b : a;
+  }
+  const SOL = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  const LUNA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="currentColor"/></svg>';
   const fmtDia = new Intl.DateTimeFormat("es-PA", { weekday: "short", day: "numeric", timeZone: "America/Panama" });
   const fmtDiaLargo = new Intl.DateTimeFormat("es-PA", { weekday: "long", day: "numeric", timeZone: "America/Panama" });
   const nombreDia = (d, largo) => d === 0 ? "Hoy" : d === 1 ? "Mañana" : (largo ? fmtDiaLargo : fmtDia).format(new Date(estado.inicios[d] + 6 * 3600000)).replace(".", "");
@@ -189,39 +194,44 @@
   function pintarDias() {
     const cont = $("dias");
     cont.innerHTML = "";
-    const noct = esNocturno();
     for (let d = 0; d < DIAS; d++) {
-      const r = mejorRato(d);
+      const di = mejorDe(d, "dia"), no = mejorDe(d, "noche"), sel = d === estado.dia;
       const b = document.createElement("button");
       b.type = "button"; b.className = "dia-b"; b.setAttribute("role", "tab");
-      b.setAttribute("aria-selected", String(d === estado.dia));
-      b.innerHTML = `<small>${nombreDia(d)}</small><b style="color:${d === estado.dia ? "" : colorPuntaje(r.max)}">${r.max}</b>`;
-      b.title = noct ? `Lo mejor de esa noche: ${r.max} de 100` : `Lo mejor de ese día: ${r.max} de 100`;
+      b.setAttribute("aria-selected", String(sel));
+      b.innerHTML = `<small>${nombreDia(d)}</small><span class="dn"><i style="color:${sel ? "" : colorPuntaje(di.max)}">${SOL}${di.max}</i><i style="color:${sel ? "" : colorPuntaje(no.max)}">${LUNA}${no.max}</i></span>`;
+      b.setAttribute("aria-label", `${nombreDia(d, true)}: de día ${di.max}, de noche ${no.max}`);
       b.addEventListener("click", () => elegirDia(d));
       cont.appendChild(b);
     }
-    $("dias-t").textContent = noct ? "Lo mejor de cada noche" : "Lo mejor de cada día";
+    $("dias-t").textContent = "Lo mejor de cada día y de cada noche";
     pintarSemana();
   }
   function pintarSemana() {
-    const noct = esNocturno(), ol = $("semana");
-    $("semana-t").textContent = noct ? "¿Qué noche ir?" : "¿Qué día ir?";
+    const ol = $("semana");
+    $("semana-t").textContent = "¿Cuándo ir esta semana?";
     const filas = [];
-    for (let d = 0; d < DIAS; d++) filas.push({ d, ...mejorRato(d) });
-    const top = Math.max(...filas.map((f) => f.max));
+    for (let d = 0; d < DIAS; d++) filas.push({ d, dia: mejorDe(d, "dia"), noche: mejorDe(d, "noche") });
+    const top = Math.max(...filas.flatMap((f) => [f.dia.max, f.noche.max]));
     ol.innerHTML = "";
     for (const f of filas) {
-      // marea alta más cercana a la mejor hora
-      const ini = estado.inicios[f.d] + f.t * 60000;
-      const alta = extremosAbs().filter((e) => e.alta).sort((a, b) => Math.abs(a.t - ini) - Math.abs(b.t - ini))[0];
-      const li = document.createElement("li"), b = document.createElement("button");
-      b.type = "button";
-      b.style.setProperty("--c", colorPuntaje(f.max));
-      const mejor = f.max === top ? ' <em class="top">la mejor</em>' : "";
-      const altaTxt = alta && estado.lugar.tipo === "pacifico" ? ` · alta ${fmtHora(Math.round((alta.t - estado.inicios[f.d]) / 60000))}` : "";
-      b.innerHTML = `<span>${noct ? (f.d === 0 ? "Esta noche" : nombreDia(f.d, true) + " en la noche") : nombreDia(f.d, true)}${mejor}<br><small>Mejor hora ${fmtHora(f.t)}${altaTxt}</small></span><b>${f.max}</b>`;
-      b.addEventListener("click", () => irAMinutoAbs(f.d, f.t));
-      li.appendChild(b); ol.appendChild(li);
+      const li = document.createElement("li");
+      li.className = "sem";
+      const nombre = document.createElement("span");
+      nombre.className = "sem-n";
+      nombre.textContent = nombreDia(f.d, true);
+      li.appendChild(nombre);
+      for (const r of [f.dia, f.noche]) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.style.setProperty("--c", colorPuntaje(r.max));
+        const etiqueta = r.parte === "dia" ? "De día" : "De noche";
+        b.innerHTML = `<span>${r.parte === "dia" ? SOL : LUNA} ${etiqueta}${r.max === top ? ' <em class="top">la mejor</em>' : ""}<br><small>${fmtHora(r.t)}</small></span><b>${r.max}</b>`;
+        b.setAttribute("aria-label", `${nombreDia(f.d, true)} ${etiqueta.toLowerCase()}: ${r.max} de 100, mejor a las ${fmtHora(r.t)}`);
+        b.addEventListener("click", () => irAMinutoAbs(f.d, r.t));
+        li.appendChild(b);
+      }
+      ol.appendChild(li);
     }
   }
 
