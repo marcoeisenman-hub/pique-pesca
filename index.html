@@ -23,6 +23,7 @@
   <main id="elegir" class="elegir">
     <h1>¿Dónde vas a pescar?</h1>
     <p class="sub">Escoge el país y el lugar. Te decimos, minuto a minuto, cuándo pica más.</p>
+    <p class="aclara">El número del 1 al 100 no dice qué tan bueno es el lugar: dice qué hora es la mejor para pescar en ese lugar. Un 90 en Coiba y un 90 en Casco Viejo quieren decir lo mismo: es de las mejores horas de ese sitio.</p>
 
     <div class="paso">
       <h2 class="paso-t">País</h2>
@@ -61,11 +62,18 @@
           <div>
             <p class="hora" id="hora">–</p>
             <p class="eti" id="eti"></p>
+            <p class="etapa" id="etapa"></p>
             <p class="aviso" id="aviso" hidden></p>
           </div>
         </div>
 
         <ul class="factores" id="factores"></ul>
+
+        <div class="tarjeta">
+          <h3>Mareas del día</h3>
+          <ul class="mareas" id="mareas"></ul>
+          <p class="m-fuente" id="m-fuente"></p>
+        </div>
 
         <div class="tarjeta senuelo">
           <h3>Qué tirar a esta hora</h3>
@@ -74,6 +82,12 @@
           <p class="s-alt" id="s-alt"></p>
           <p class="s-col" id="s-col"></p>
           <p class="s-por" id="s-por"></p>
+          <p class="s-local" id="s-local"></p>
+        </div>
+
+        <div class="tarjeta" id="t-nota" hidden>
+          <h3>Lo que hay que saber de este lugar</h3>
+          <p class="nota-l" id="nota-l"></p>
         </div>
 
         <div class="tarjeta">
@@ -103,16 +117,17 @@
 
     <section class="como">
       <h2>Cómo sale el número</h2>
-      <p>Cada minuto junta cuatro cosas: el movimiento de la marea (el agua que se mueve trae comida), la luz (amanecer y atardecer son lo mejor), los periodos de la luna (cuando está arriba, abajo, saliendo o poniéndose) y el clima (viento, olas, lluvia y la presión). En el Caribe la marea casi no cambia, así que pesa menos; en los lagos no cuenta.</p>
-      <p>Es una guía para escoger la hora, no una promesa de que vas a sacar algo. La marea viene de un modelo del océano y puede variar unos minutos o centímetros dentro de bahías y esteros. No la uses para navegar.</p>
+      <p>El número compara las horas de un mismo lugar, no un lugar con otro. Cada minuto junta cuatro cosas: la marea (en qué etapa va y qué tan rápido se mueve el agua), la hora del día según cómo pica en ese sitio (en Ocean Reef la noche es lo mejor, en Gatún el sargento come de día), los periodos de la luna y el clima (viento, olas, lluvia y presión).</p>
+      <p>Las horas de marea alta y baja salen de la estación de marea más cercana (datos armónicos de la NOAA, los mismos con que se hacen las tablas oficiales). Dentro de esteros y ríos la marea puede llegar más tarde. Es una guía para escoger la hora, no una promesa de que vas a sacar algo, y no sirve para navegar.</p>
     </section>
   </main>
 
   <footer class="pie">
-    <p>Marea y clima: <a href="https://open-meteo.com/" rel="noopener">Open-Meteo</a> (CC BY 4.0). Sol y luna calculados en tu teléfono.</p>
+    <p>Mareas: estaciones de la NOAA (dominio público) y TICON-4 (CC BY 4.0), calculadas con <a href="https://github.com/openwatersio/neaps" rel="noopener">Neaps</a> (MIT). Clima y olas: <a href="https://open-meteo.com/" rel="noopener">Open-Meteo</a> (CC BY 4.0). Sol y luna calculados en tu teléfono. Datos de pesca de cada lugar: reportes de charters, guías y pescadores.</p>
   </footer>
 
   <script src="lugares.js"></script>
+  <script src="mareas.js"></script>
   <script src="motor.js"></script>
   <script src="senuelos.js"></script>
   <script src="app.js"></script>

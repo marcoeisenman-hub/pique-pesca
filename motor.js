@@ -82,11 +82,19 @@
   const gauss = (x, sd) => Math.exp(-(x * x) / (2 * sd * sd));
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 
+  /* perfil por defecto: qué tan buena es cada franja (0-1) y qué etapas de marea
+     "final_llenante" = 1-2 h antes de la alta (regla de los pescadores) */
+  const PERFIL_DEFECTO = {
+    pacifico: { noche: 0.5, amanecer: 1, dia: 0.35, atardecer: 1, marea: ["final_llenante", "inicio_vaciante:0.8", "final_vaciante:0.6"], mareaMala: "ninguna" },
+    caribe: { noche: 0.5, amanecer: 1, dia: 0.4, atardecer: 1, marea: ["cualquiera_moviendose"], mareaMala: "ninguna" },
+    dulce: { noche: 0.25, amanecer: 1, dia: 0.5, atardecer: 0.95, marea: [], mareaMala: "ninguna" },
+  };
+
   /* pesos según tipo de agua (Codex + Claude, orientativos) */
   const PESOS = {
-    pacifico: { marea: 0.38, luz: 0.27, clima: 0.2, luna: 0.15 },
-    caribe: { marea: 0.12, luz: 0.36, clima: 0.36, luna: 0.16 },
-    dulce: { marea: 0, luz: 0.45, clima: 0.4, luna: 0.15 },
+    pacifico: { marea: 0.34, luz: 0.36, clima: 0.14, luna: 0.16 },
+    caribe: { marea: 0.1, luz: 0.45, clima: 0.3, luna: 0.15 },
+    dulce: { marea: 0, luz: 0.55, clima: 0.3, luna: 0.15 },
   };
 
   /* ---------- un día completo para un lugar ----------
@@ -129,12 +137,15 @@
 
     // marea por minuto
     let marea = null, mareaRate = null, rango = 0, maxRate = 0;
-    const mareaArr = lugar.tipo !== "dulce" ? limpiar(datos.marea) : null;
+    // marea: primero la predicción armónica de la estación (como las tablas oficiales); si no hay, el modelo del océano
+    const est = lugar.tipo !== "dulce" ? datos.estacion : null;
+    const mareaArr = est ? est.niveles : lugar.tipo !== "dulce" ? limpiar(datos.marea) : null;
     if (mareaArr) {
       const f = pchip(mareaArr);
+      const idxM = est ? (min) => (inicioMs + min * 60000 - est.inicio) / est.paso : idxHora;
       marea = new Float32Array(LARGO);
       mareaRate = new Float32Array(LARGO);
-      for (let k = 0; k < LARGO; k++) marea[k] = f(idxHora(T0 + k));
+      for (let k = 0; k < LARGO; k++) marea[k] = f(idxM(T0 + k));
       for (let k = 0; k < LARGO; k++) {
         const a = marea[Math.max(0, k - 5)], b = marea[Math.min(LARGO - 1, k + 5)];
         mareaRate[k] = ((b - a) / (Math.min(LARGO - 1, k + 5) - Math.max(0, k - 5))) * 60; // m por hora
@@ -145,13 +156,40 @@
         maxRate = Math.max(maxRate, Math.abs(mareaRate[k]));
       }
       rango = mx - mn;
-      for (let k = MARGEN; k < MARGEN + N; k++) {
-        const p = mareaRate[k - 1], q = mareaRate[k];
-        if (p > 0 && q <= 0) eventos.push({ t: k - MARGEN, tipo: "marea", texto: `Marea alta · ${marea[k].toFixed(1)} m` });
-        if (p < 0 && q >= 0) eventos.push({ t: k - MARGEN, tipo: "marea", texto: `Marea baja · ${marea[k].toFixed(1)} m` });
+      if (est) {
+        for (const e of est.extremos) {
+          const t = Math.round((e.t - inicioMs) / 60000);
+          if (t >= 0 && t < N) eventos.push({ t, tipo: "marea", alta: e.alta, nivel: e.nivel, texto: `Marea ${e.alta ? "alta" : "baja"} · ${e.nivel.toFixed(1)} m` });
+        }
+      } else {
+        for (let k = MARGEN; k < MARGEN + N; k++) {
+          const p = mareaRate[k - 1], q = mareaRate[k];
+          if (p > 0 && q <= 0) eventos.push({ t: k - MARGEN, tipo: "marea", alta: true, nivel: marea[k], texto: `Marea alta · ${marea[k].toFixed(1)} m` });
+          if (p < 0 && q >= 0) eventos.push({ t: k - MARGEN, tipo: "marea", alta: false, nivel: marea[k], texto: `Marea baja · ${marea[k].toFixed(1)} m` });
+        }
       }
     }
     eventos.sort((a, b) => a.t - b.t);
+
+    // todas las altas y bajas (con margen) para saber en qué etapa va la marea
+    const extremos = [];
+    if (marea && est) {
+      for (const e of est.extremos) extremos.push({ t: Math.round((e.t - inicioMs) / 60000), alta: e.alta });
+    } else if (marea) {
+      for (let k = 1; k < LARGO; k++) {
+        const p = mareaRate[k - 1], q = mareaRate[k];
+        if (p > 0 && q <= 0) extremos.push({ t: T0 + k, alta: true });
+        if (p < 0 && q >= 0) extremos.push({ t: T0 + k, alta: false });
+      }
+    }
+    let mnM = 0;
+    if (marea) { mnM = Infinity; for (let k = MARGEN; k < MARGEN + N; k++) mnM = Math.min(mnM, marea[k]); }
+
+    // perfil del lugar (investigado) o uno por defecto según el tipo de agua
+    const perfil = { ...PERFIL_DEFECTO[lugar.tipo], ...(lugar.perfil || {}) };
+    const etapas = (perfil.marea || ["cualquiera_moviendose"]).map((e) => {
+      const [n, w] = String(e).split(":"); return { n, w: w ? +w : 1 };
+    });
 
     // clima por hora interpolado
     const pres = limpiar(datos.presion), vien = limpiar(datos.viento), olas = limpiar(datos.olas);
@@ -177,23 +215,46 @@
 
       // marea: agua moviéndose = mejor; subiendo un poco mejor
       let cMarea = 0, rate = 0;
+      let etapa = null, posMarea = 0.5;
       if (marea) {
         rate = mareaRate[k];
-        const flujo = maxRate > 0 ? Math.abs(rate) / maxRate : 0;
-        cMarea = clamp(Math.pow(flujo, 0.75) * (rate > 0 ? 1 : 0.9) * (0.55 + 0.45 * fuerzaMarea), 0, 1);
+        const flujo = maxRate > 0 ? Math.pow(Math.abs(rate) / maxRate, 0.75) : 0;
+        let ant = null, sig = null;
+        for (const e of extremos) { if (e.t <= m) ant = e; else { sig = e; break; } }
+        const subiendo = rate > 0;
+        const aAlta = sig && sig.alta ? sig.t - m : null, desdeAlta = ant && ant.alta ? m - ant.t : null;
+        const aBaja = sig && !sig.alta ? sig.t - m : null, desdeBaja = ant && !ant.alta ? m - ant.t : null;
+        const valor = (n) => {
+          switch (n) {
+            case "final_llenante": return aAlta != null ? gauss(aAlta - 70, 48) : desdeAlta != null ? 0.55 * gauss(desdeAlta, 25) : 0;
+            case "inicio_vaciante": return desdeAlta != null ? gauss(desdeAlta - 60, 45) : 0;
+            case "final_vaciante": return aBaja != null ? gauss(aBaja - 60, 42) : desdeBaja != null ? 0.5 * gauss(desdeBaja, 25) : 0;
+            case "inicio_llenante": return desdeBaja != null ? gauss(desdeBaja - 60, 45) : 0;
+            case "llenante": return subiendo ? 0.55 + 0.45 * flujo : 0.2 * flujo;
+            case "vaciante": return !subiendo ? 0.55 + 0.45 * flujo : 0.2 * flujo;
+            default: return flujo;
+          }
+        };
+        let mejor = 0;
+        for (const e of etapas) { const v = valor(e.n) * e.w; if (v > mejor) { mejor = v; etapa = e.n; } }
+        const soloFlujo = etapas.length === 1 && etapas[0].n === "cualquiera_moviendose";
+        cMarea = soloFlujo ? flujo : 0.35 * flujo + 0.65 * mejor;
+        cMarea = clamp(cMarea * (0.55 + 0.45 * fuerzaMarea), 0, 1);
+        posMarea = rango > 0 ? (marea[k] - mnM) / rango : 0.5;
       }
 
       // luz: amanecer y atardecer mandan; mediodía con sol fuerte es lo peor
       const alt = solAlt[k];
-      let cLuz;
-      if (alt > 0) cLuz = 0.42 - 0.3 * Math.min(1, alt / 70);
-      else cLuz = 0.32 + 0.18 * fase.fraccion; // de noche ayuda la luna llena
-      let crep = 0;
-      for (const t of salidaSol) crep = Math.max(crep, gauss(m - (t + 15), 55));
-      for (const t of puestaSol) crep = Math.max(crep, gauss(m - (t - 15), 55));
-      cLuz = Math.max(cLuz, crep);
+      const vDia = perfil.dia * (1 - 0.2 * clamp((alt - 6) / 60, 0, 1));
+      const vNoche = perfil.noche * (0.88 + 0.12 * fase.fraccion); // la luna llena ayuda un poco de noche
+      let cLuz = alt >= 6 ? vDia : alt <= -6 ? vNoche : vNoche + (vDia - vNoche) * ((alt + 6) / 12);
+      let gA = 0, gP = 0;
+      for (const t of salidaSol) gA = Math.max(gA, gauss(m - (t + 10), 50));
+      for (const t of puestaSol) gP = Math.max(gP, gauss(m - (t - 10), 50));
+      cLuz = Math.max(cLuz, perfil.amanecer * gA, perfil.atardecer * gP);
       const nubes = fNub(hi);
-      if (nubes != null && alt > 25 && nubes > 60) cLuz = Math.min(1, cLuz + 0.12); // nublado al mediodía ayuda
+      if (nubes != null && alt > 25 && nubes > 60 && perfil.dia < 0.7) cLuz = Math.min(1, cLuz + 0.1); // nublado al mediodía ayuda
+      const franja = gA > 0.5 ? "amanecer" : gP > 0.5 ? "atardecer" : alt > 0 ? "dia" : "noche";
 
       // luna (solunar): periodos mayores ±1 h, menores ±30 min, fuerza según fase
       let sol = 0.08;
@@ -224,6 +285,8 @@
       if (cod >= 95) { cClima = Math.min(cClima, 0.1); aviso = "Tormenta eléctrica: no salgas al agua"; }
 
       let total = pesos.marea * cMarea + pesos.luz * cLuz + pesos.clima * cClima + pesos.luna * cLuna;
+      if (marea && perfil.mareaMala === "baja" && posMarea < 0.2) total *= 0.55 + 0.45 * (posMarea / 0.2);
+      if (marea && perfil.mareaMala === "alta" && posMarea > 0.85) total *= 0.6 + 0.4 * ((1 - posMarea) / 0.15);
       if (lugar.tipo === "dulce") total *= 0.93; // sin marea hay menos señales fuertes
       if (aviso && cod >= 95) total = Math.min(total, 0.15);
       puntaje[m] = clamp(Math.round(100 * Math.pow(total, 0.92)), 1, 100);
@@ -231,13 +294,13 @@
       comp.luz[m] = Math.round(cLuz * 100);
       comp.clima[m] = Math.round(cClima * 100);
       comp.luna[m] = Math.round(cLuna * 100);
-      detalle[m] = { rate, viento: v, rafagas: r, olas: o, lluvia: ll, aviso, solAlt: alt };
+      detalle[m] = { rate, etapa, franja, posMarea, viento: v, rafagas: r, olas: o, lluvia: ll, aviso, solAlt: alt };
     }
 
     return {
-      puntaje, comp, detalle, eventos, pesos,
+      puntaje, comp, detalle, eventos, pesos, perfil,
       marea: marea ? marea.subarray(MARGEN, MARGEN + N) : null,
-      mareaTodo: marea, margen: MARGEN, rango,
+      mareaTodo: marea, margen: MARGEN, rango, fuenteMarea: est ? "estacion" : marea ? "modelo" : null,
       fase: { ...fase, nombre: nombreFase(fase) },
       mejores: mejoresRatos(puntaje),
       maximo: puntaje.reduce((a, b) => Math.max(a, b), 0),
@@ -274,7 +337,7 @@
     return "Flojo";
   }
 
-  const api = { calcularDia, etiqueta, faseLuna, nombreFase, pchip, limpiar, mejoresRatos, PESOS };
+  const api = { PERFIL_DEFECTO, calcularDia, etiqueta, faseLuna, nombreFase, pchip, limpiar, mejoresRatos, PESOS };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else raiz.Motor = api;
 })(typeof window !== "undefined" ? window : globalThis);

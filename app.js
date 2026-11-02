@@ -140,6 +140,15 @@
       estado.datos = datos;
       estado.inicios = [];
       estado.dias = [];
+      // marea de la estación más cercana (predicción armónica, no se guarda en caché)
+      datos.estacion = null;
+      if (l.estacion && window.Mareas) {
+        try {
+          const t0 = datos.tiempos[0] * 1000;
+          datos.estacion = window.Mareas.predecir(l.estacion, t0, t0 + (DIAS + 2) * DIA_MS);
+          datos.estacionNombre = window.Mareas.estaciones[l.estacion].nombre;
+        } catch (e) { console.error(e); }
+      }
       for (let d = 0; d < DIAS; d++) {
         const ini = datos.tiempos[24 + d * 24] * 1000;
         estado.inicios.push(ini);
@@ -185,6 +194,10 @@
     let m = d === 0 && ahora != null ? ahora : dia.mejores.slice().sort((a, b) => b.max - a.max)[0].pico;
     $("b-ahora").hidden = !(d === 0 && ahora != null);
     pintarRatos();
+    pintarMareas();
+    const l = estado.lugar;
+    $("t-nota").hidden = !l.nota;
+    $("nota-l").textContent = l.nota || "";
     medir();
     irA(m, false);
     dibujar();
@@ -203,6 +216,34 @@
       b.addEventListener("click", () => irA(r.pico, true));
       li.appendChild(b); ol.appendChild(li);
     }
+  }
+
+  /* ---------- mareas del día ---------- */
+  const FLECHA_ALTA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 5 12h4v8h6v-8h4z" fill="#9FE3DB"/></svg>';
+  const FLECHA_BAJA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20l7-8h-4V4H9v8H5z" fill="#E9C46A"/></svg>';
+  function extremosAbs() {
+    const e = estado.datos && estado.datos.estacion;
+    if (e && estado.lugar.tipo !== "dulce") return e.extremos;
+    const out = [];
+    estado.dias.forEach((dia, d) => dia.eventos.filter((x) => x.tipo === "marea").forEach((x) => out.push({ t: estado.inicios[d] + x.t * 60000, alta: x.alta, nivel: x.nivel })));
+    return out;
+  }
+  function pintarMareas() {
+    const dia = estado.dias[estado.dia], ul = $("mareas");
+    const ms = dia.eventos.filter((e) => e.tipo === "marea");
+    if (!dia.marea) {
+      ul.innerHTML = `<li style="grid-template-columns:1fr">${estado.lugar.tipo === "dulce" ? "En el lago no hay marea." : "No hay datos de marea para este punto."}</li>`;
+      $("m-fuente").textContent = "";
+      return;
+    }
+    ul.innerHTML = ms.map((e) => `<li data-t="${e.t}">${e.alta ? FLECHA_ALTA : FLECHA_BAJA}<span>${e.alta ? "Alta" : "Baja"} <span class="alt">${e.nivel.toFixed(1)} m</span></span><b>${fmtHora(e.t)}</b></li>`).join("");
+    $("m-fuente").textContent = dia.fuenteMarea === "estacion"
+      ? `Estación de marea ${estado.datos.estacionNombre} (NOAA). Altura sobre la bajamar media.`
+      : "Modelo del océano (Open-Meteo): las horas pueden variar unos minutos.";
+  }
+  function durTexto(min) {
+    const h = Math.floor(min / 60), m = min % 60;
+    return h ? `${h} h ${m} min` : `${m} min`;
   }
 
   /* ---------- carrete (canvas virtual) ---------- */
@@ -407,20 +448,39 @@
     let tMarea;
     if (!dia.marea) tMarea = l.tipo === "dulce" ? "En el lago no hay marea: cuenta la luz, la luna y el clima." : "Sin datos de marea para este punto ahora.";
     else {
-      const cm = Math.round(det.rate * 100), sig = prox("marea", m);
+      const cm = Math.round(det.rate * 100);
       tMarea = Math.abs(cm) < 6 ? "Casi parada: está cambiando la marea." : cm > 0 ? `Subiendo ${cm} cm por hora.` : `Bajando ${-cm} cm por hora.`;
-      if (sig) tMarea += ` ${sig.texto.split(" · ")[0]} a las ${fmtHora(sig.t)}`;
+      const PREF = { final_llenante: "Aquí lo mejor es 1–2 h antes de la alta.", inicio_vaciante: "Aquí lo mejor es cuando empieza a vaciar.", final_vaciante: "Aquí lo mejor es la última hora antes de la baja.", llenante: "Aquí pica más con la marea subiendo.", vaciante: "Aquí pica más con la marea bajando." };
+      const pref = (dia.perfil.marea || [])[0];
+      if (pref && PREF[pref]) tMarea += " " + PREF[pref];
+      if (dia.perfil.mareaMala === "baja" && det.posMarea < 0.2) tMarea += " Marea muy baja: casi no hay agua en la orilla.";
       if (dia.rango < 0.6) tMarea += " Aquí la marea es chiquita.";
     }
+    // etapa de la marea
+    let tEtapa = "";
+    if (dia.marea) {
+      const ahoraMs = estado.inicios[estado.dia] + m * 60000, ex = extremosAbs();
+      const sig = ex.find((e) => e.t > ahoraMs);
+      if (sig) {
+        const falta = Math.round((sig.t - ahoraMs) / 60000);
+        tEtapa = `${sig.alta ? "Llenante (subiendo)" : "Vaciante (bajando)"}: faltan ${durTexto(falta)} para la ${sig.alta ? "alta" : "baja"}.`;
+      }
+    }
+    $("etapa").textContent = tEtapa;
+    document.querySelectorAll("#mareas li[data-t]").forEach((li) => li.classList.toggle("pasada", +li.dataset.t < m));
     // luz
     const alt = det.solAlt;
     const amanecer = dia.eventos.find((e) => e.texto === "Amanecer"), atardecer = dia.eventos.find((e) => e.texto === "Atardecer");
     let tLuz;
-    if (amanecer && Math.abs(m - amanecer.t) <= 50) tLuz = `Amanecer a las ${fmtHora(amanecer.t)}: de las mejores horas.`;
-    else if (atardecer && Math.abs(m - atardecer.t) <= 50) tLuz = `Atardecer a las ${fmtHora(atardecer.t)}: de las mejores horas.`;
-    else if (alt > 45) tLuz = "Sol fuerte: los peces bajan a lo hondo o a la sombra.";
+    if (amanecer && Math.abs(m - amanecer.t) <= 50) tLuz = `Amanecer a las ${fmtHora(amanecer.t)}.`;
+    else if (atardecer && Math.abs(m - atardecer.t) <= 50) tLuz = `Atardecer a las ${fmtHora(atardecer.t)}.`;
+    else if (alt > 45) tLuz = "Sol fuerte.";
     else if (alt > 0) tLuz = "De día, con el sol todavía bajo.";
     else tLuz = `De noche · ${dia.fase.nombre.toLowerCase()} (${Math.round(dia.fase.fraccion * 100)}% iluminada).`;
+    const pf = dia.perfil, vFr = pf[det.franja];
+    const NOMBRE_FR = { noche: "la noche", dia: "el día", amanecer: "el amanecer", atardecer: "el atardecer" };
+    if (vFr >= 0.85) tLuz += ` Aquí ${NOMBRE_FR[det.franja]} es de lo mejor.`;
+    else if (vFr <= 0.3) tLuz += ` Aquí ${NOMBRE_FR[det.franja]} casi no pica.`;
     // luna
     const lunas = dia.eventos.filter((e) => e.tipo === "luna");
     const cerca = lunas.find((e) => Math.abs(e.t - m) <= (e.texto.includes("mayor") ? 60 : 30));
@@ -438,7 +498,7 @@
       if (det.lluvia > 0.3) tClima += ` · lluvia ${det.lluvia.toFixed(1)} mm`;
       tClima += ".";
     }
-    const fs = [["Marea", dia.comp.marea[m], tMarea, dia.pesos.marea], ["Luz", dia.comp.luz[m], tLuz, dia.pesos.luz],
+    const fs = [["Marea", dia.comp.marea[m], tMarea, dia.pesos.marea], ["Hora", dia.comp.luz[m], tLuz, dia.pesos.luz],
       ["Luna", dia.comp.luna[m], tLuna, dia.pesos.luna], ["Clima", dia.comp.clima[m], tClima, dia.pesos.clima]];
     $("factores").innerHTML = fs.map(([n, v, t, w]) => `<li class="factor"${w === 0 ? ' style="opacity:.55"' : ""}><span class="f-n">${n}</span><span class="f-b"><i style="width:${w === 0 ? 0 : v}%;background:${colorPuntaje(v)}"></i></span><span class="f-v">${w === 0 ? "—" : v}</span><p class="f-t">${t}</p></li>`).join("");
 
@@ -452,6 +512,7 @@
     $("s-alt").textContent = "Si no pica: " + s.alterno.charAt(0).toLowerCase() + s.alterno.slice(1) + ".";
     $("s-col").textContent = "Colores: " + s.color.charAt(0).toLowerCase() + s.color.slice(1) + ".";
     $("s-por").textContent = s.porque;
+    $("s-local").innerHTML = l.local ? `<b>Lo que usan los de aquí:</b> ${l.local.charAt(0).toLowerCase() + l.local.slice(1)}.` : "";
   }
 
   /* ---------- eventos ---------- */

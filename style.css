@@ -50,6 +50,7 @@ a { color: var(--espuma); }
   margin: 0 0 12px; letter-spacing: -0.01em;
 }
 .sub { color: var(--suave); margin: 0 0 32px; max-width: 46ch; font-size: 17px; }
+.aclara { margin: -18px 0 30px; max-width: 54ch; font-size: 14.5px; color: var(--espuma); background: rgba(243, 235, 221, 0.08); border-left: 3px solid var(--boya); padding: 10px 14px; border-radius: 0 10px 10px 0; }
 .paso { margin-bottom: 26px; }
 .paso-t { font: 700 15px/1 var(--texto); color: var(--suave); margin: 0 0 12px; }
 .paises { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -131,6 +132,17 @@ a { color: var(--espuma); }
 #num { font: 900 46px/1 var(--display); font-variant-numeric: tabular-nums; }
 .hora { font: 800 30px/1 var(--display); margin: 0 0 4px; font-variant-numeric: tabular-nums; }
 .eti { margin: 0; font-weight: 700; color: var(--c, var(--espuma)); font-size: 17px; }
+.etapa { margin: 4px 0 0; font-size: 13.5px; color: var(--suave); }
+.mareas { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.mareas li { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 10px; background: var(--tenue); font-size: 15px; }
+.mareas li.pasada { opacity: 0.5; }
+.mareas li b { font: 800 20px/1 var(--display); font-variant-numeric: tabular-nums; }
+.mareas svg { width: 22px; height: 22px; }
+.mareas .alt { color: #9fe3db; font-weight: 600; font-size: 13px; }
+.m-fuente { margin: 8px 0 0; font-size: 12px; color: var(--suave); }
+.s-local { margin-top: 8px !important; color: var(--suave); }
+.s-local b { color: var(--espuma); }
+.nota-l { margin: 0; font-size: 14.5px; }
 .aviso { margin: 6px 0 0; font-size: 13px; font-weight: 600; background: rgba(255, 90, 31, 0.18); color: #ffb79a; padding: 4px 8px; border-radius: 8px; }
 
 .factores { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }

@@ -16,10 +16,15 @@
     let principal, alterno, porque, sinCarnada = null;
 
     if (lugar.tipo === "dulce") {
-      if (lugar.id === "fortuna") {
-        principal = "Spinner pequeño plateado (tipo cucharita giratoria)";
-        alterno = "Mosca seca o ninfa cerca de la orilla";
-        porque = "La trucha ataca cosas chiquitas que brillan y se mueven.";
+      if (lugar.id === "fortuna" || lugar.id === "bayano") {
+        principal = "Lombriz o masa en anzuelo chico, cerca del fondo";
+        alterno = lugar.id === "fortuna" ? "Señuelo chico o sardina para el guapote" : "En el río abajo de la represa: sardina o lisa viva para sábalo";
+        porque = "Aquí lo que más hay es tilapia, que come cosas chiquitas cerca del fondo.";
+      } else if (momento === "dia" && (lugar.id === "gatun" || lugar.id === "gamboa" || lugar.id === "alajuela")) {
+        principal = "Sardina viva o popper cerca de troncos y puntas";
+        alterno = "Crankbait color fuego (firetiger) o spinnerbait";
+        porque = "El sargento come de día, sobre todo a media mañana y de 1 a 5 p. m.";
+        sinCarnada = "Popper o torpedo en la superficie";
       } else if (momento === "crepusculo") {
         principal = "Popper o señuelo de superficie que camina";
         alterno = "Spinnerbait recogido justo debajo del agua";
