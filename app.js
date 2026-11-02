@@ -183,7 +183,7 @@
   const fmtDiaLargo = new Intl.DateTimeFormat("es-PA", { weekday: "long", day: "numeric", timeZone: "America/Panama" });
   const nombreDia = (d, largo) => d === 0 ? "Hoy" : d === 1 ? "Mañana" : (largo ? fmtDiaLargo : fmtDia).format(new Date(estado.inicios[d] + 6 * 3600000)).replace(".", "");
   function irAMinutoAbs(d, t) {
-    if (t >= 1440 && d + 1 < DIAS) elegirDia(d + 1, false, t - 1440);
+    if (t >= 1440 && d + 1 < estado.dias.length) elegirDia(d + 1, false, t - 1440);
     else elegirDia(d, false, Math.min(t, 1439));
   }
   function pintarDias() {
@@ -235,7 +235,8 @@
     pintarDias();
     const dia = estado.dias[d];
     const ahora = minutoAhora();
-    let m = objetivo != null ? objetivo : d === 0 && ahora != null ? ahora : mejorRato(d).t % 1440;
+    const mr = mejorRato(d);
+    let m = objetivo != null ? objetivo : d === 0 && ahora != null ? ahora : mr.t < 1440 ? mr.t : dia.mejores.slice().sort((a, b) => b.max - a.max)[0].pico;
     $("b-ahora").hidden = !(d === 0 && ahora != null);
     pintarRatos();
     pintarMareas();
